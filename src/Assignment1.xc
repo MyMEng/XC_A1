@@ -17,23 +17,23 @@
 // XC-1A board. Your task is to extend the given skeleton code to implement
 // the following game:
 //
-// An ìLED Antî is represented by a position on the clock wheel of the
-// XC-1A board. Each ìLED Antî is visualised by one active red LED on
-// the 12-position LED clock marked with LED labels I, II, II,Ö, XII.
+// An “LED Ant” is represented by a position on the clock wheel of the
+// XC-1A board. Each “LED Ant” is visualised by one active red LED on
+// the 12-position LED clock marked with LED labels I, II, II,…, XII.
 // No two LED Ants can have the same position on the clock. During the
 // game, the user has to defend LED positions I, XII and XI from an
 // LED Attacker Ant by controlling one LED Defender Ant and blocking the
 // attacker's path.
 //
 // Defender Ant
-// The user controls one ìLED Antî by pressing either button A (moving
+// The user controls one “LED Ant” by pressing either button A (moving
 // 1 position clockwise) or button D (moving 1 position anti-clockwise).
 // The defender ant can only move to a position that is not already occupied
-// by the attacker ant. The defenderís starting position is LED XII. A sound
+// by the attacker ant. The defender’s starting position is LED XII. A sound
 // is played when the user presses a button.
 //
 // Attacker Ant
-// A second ìLED Antî is controlled by the system and starts at LED position VI.
+// A second “LED Ant” is controlled by the system and starts at LED position VI.
 // It then attempts moving in one direction (either clockwise or anti-clockwise).
 // This attempt is denied if the defender ant is already located there, in this
 // case the attacker ant changes direction. To make the game more interesting:
@@ -53,6 +53,12 @@ out port cledG = PORT_CLOCKLED_SELG;
 out port cledR = PORT_CLOCKLED_SELR;
 in port buttons = PORT_BUTTON;
 out port speaker = PORT_SPEAKER;
+
+//numbers that function pinsneq returns that correspond to buttons
+#define buttonA 14
+#define buttonB 13
+#define buttonC 11
+#define buttonD 7
 
 // Sound frequency
 #define FRQ_A 39995
@@ -81,6 +87,7 @@ void visualiser(chanend fromUserAnt, chanend fromAttackerAnt, chanend toQuadrant
 		toQuadrant2, chanend toQuadrant3) {
 	unsigned int userAntToDisplay = 11;
 	unsigned int attackerAntToDisplay = 5;
+
 	int i, j;
 	cledR <: 1;
 	while (1) {
@@ -117,15 +124,21 @@ void playSound(unsigned int wavelength, out port speaker, int timePeriod) {
 //READ BUTTONS and send to userAnt
 void buttonListener(in port b, out port spkr, chanend toUserAnt) {
 	int r;
+	int muteSound = 1;
 	while (1) {
 
 		// check if some buttons are pressed
 		b when pinsneq(15) :> r;
 
+		//mute sound feature
+		if (r == buttonB) muteSound = !(muteSound);
+
+
 		// play sound
+		if (!muteSound)
 		{
 			int i = FRQ_A;
-			for(int c = 0 ; c < 10; c++) {
+			for(int c = 0 ; c < 2; c++) {
 				//int a = mario[0][c];
 				//int b = mario[1][c];
 				playSound(i, spkr, 100);
@@ -167,11 +180,14 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
 	toVisualiser <: userAntPosition; //show initial position
 
 	while (1) {
+		//B 13 | C 11
 		fromButtons :> buttonInput;
-		if (buttonInput == 14) attemptedAntPosition = userAntPosition + 1;
-		if (buttonInput == 7) attemptedAntPosition = userAntPosition - 1;
+		if (buttonInput == buttonA) attemptedAntPosition = userAntPosition + 1;
+		if (buttonInput == buttonD) attemptedAntPosition = userAntPosition - 1;
 
 
+		userAntPosition = attemptedAntPosition;
+		toVisualiser <: userAntPosition;
 		////////////////////////////////////////////////////////////
 		//
 		// !!! place code here for userAnt behaviour
@@ -203,7 +219,7 @@ void attackerAnt(chanend toVisualiser, chanend toController) {
 		waitMoment();
 	}
 }
-//COLLISION DETECTOR... the controller process responds to ìpermission-to-moveî requests
+//COLLISION DETECTOR... the controller process responds to “permission-to-move” requests
 // from attackerAnt and userAnt. The process also checks if an attackerAnt
 // has moved to LED positions I, XII and XI.
 void controller(chanend fromAttacker, chanend fromUser) {
