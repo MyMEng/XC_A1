@@ -179,7 +179,7 @@ void waitMoment() {
 void normalizeAntPosition(unsigned int& antPosition)
 {
 	//Normalize position when mod 12 == 0
-	if(antPosition == -1) antPosition = 11;
+	if(antPosition == -1 ) antPosition = 11;
 	else if(antPosition == 12) antPosition = 0;
 }
 
@@ -225,6 +225,7 @@ unsigned int shouldChangeDirection(int moveCount)
 	return (moveCount % 31 == 0 || moveCount % 37 == 0
 			|| moveCount % 43 == 0);
 }
+
 
 //ATTACKER PROCESS... The attacker is controlled by this process attackerAnt,
 // which has channels to the visualiser and controller
@@ -283,14 +284,17 @@ void attackerAnt(chanend toVisualiser, chanend toController) {
 			printf("Current attacker pos %d\n", attackerAntPosition);
 		} else {
 			printf("Cannot move. Change dir. Pos %d\n", attackerAntPosition);
+
+			// Move in oppsite direction than we wanted before
+			// Attempt new positon left or right based on current direction
+
+			if(currentDirection) attemptedAntPosition = attackerAntPosition - 1;
+			else attemptedAntPosition = attackerAntPosition + 1;
+			attackerAntPosition = attemptedAntPosition;
+
 			// If attacker is next to the user and not allowed to move
 			// then change direction
 			currentDirection = !currentDirection;
-			// Move in oppsite direction than we wanted before
-			// Attempt new positon left or right based on current direction
-			if(currentDirection) attemptedAntPosition--;
-			else attemptedAntPosition++;
-			attackerAntPosition = attemptedAntPosition;
 		}
 
 		// Move Ant wherever it was decided
