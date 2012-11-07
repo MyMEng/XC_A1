@@ -64,6 +64,10 @@ out port speaker = PORT_SPEAKER;
 #define FRQ_A 39995
 #define FRQ_B 40000
 
+// Define bool, true and false
+typedef unsigned int bool;
+#define true 1
+#define false 0
 
 int mario[2][14] = {{660, 0,   660, 0,   660, 0, 510, 0,   660, 0,   770, 0,   380, 0}, {100, 150, 100, 300, 100, 300,   100, 100, 100, 300, 100, 550, 100, 575}};
 void waitMoment();
@@ -77,7 +81,7 @@ void waitMoment();
 int showLED(out port p, chanend fromVisualiser) {
 	unsigned int lightUpPattern;
 
-	while (1) {
+	while (true) {
 		fromVisualiser :> lightUpPattern; //read LED pattern from visualiser process
 		p <: lightUpPattern; //send pattern to LEDs
 	}
@@ -95,7 +99,7 @@ void visualiser(chanend fromUserAnt, chanend fromAttackerAnt, chanend toQuadrant
 	cledR <: 1;
 
 
-	while (1) {
+	while (true) {
 
 		select {
 			case fromUserAnt :> userAntToDisplay:
@@ -131,7 +135,8 @@ void playSound(unsigned int wavelength, out port speaker, int timePeriod) {
 void buttonListener(in port b, out port spkr, chanend toUserAnt) {
 	int r;
 	int muteSound = 0;
-	while (1) {
+
+	while (true) {
 		// check if some buttons are pressed
 		b when pinsneq(15) :> r;
 
@@ -140,6 +145,7 @@ void buttonListener(in port b, out port spkr, chanend toUserAnt) {
 			muteSound = ~muteSound;
 		}
 
+		// Wait to slow down movements when buttons are pressed
 		waitMoment();
 
 		// play sound
@@ -168,79 +174,48 @@ void waitMoment() {
 	tmr when timerafter(waitTime) :> void;
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
-//
-// RELEVANT PART OF CODE TO EXPAND FOR YOU
-//
-/////////////////////////////////////////////////////////////////////////////////////////
+// Make mouse position not exceeding certain values
+// so that it moves in a circle
+void normalizeAntPosition(unsigned int& antPosition)
+{
+	//Normalize position when mod 12 == 0
+	if(antPosition == -1) antPosition = 11;
+	else if(antPosition == 12) antPosition = 0;
+}
+
 //DEFENDER PROCESS... The defender is controlled by this process userAnt,
-// which has channels to a buttonListener, visualiser and controller
+//which has channels to a buttonListener, visualiser and controller
 void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
 	unsigned int userAntPosition = 11; //the current defender position
 	int buttonInput; //the input pattern from the buttonListener
 	unsigned int attemptedAntPosition = 0; //the next attempted defender position after considering button
-	int moveForbidden; //the verdict of the controller if move is allowed
 
-	unsigned int decider; //if 1 allow to move otherwise forbid
+	//the verdict of the controller if move is allowed
+	int moveForbidden = false;
 
 	toVisualiser <: userAntPosition; //show initial position
 
+	//Code for userAnt behaviour
+	while (true) {
 
-	while (1) {
+		// See what buttons are pressed and attempt to move left or right
 		fromButtons :> buttonInput;
 		if (buttonInput == buttonA) attemptedAntPosition = userAntPosition + 1;
 		if (buttonInput == buttonD) attemptedAntPosition = userAntPosition - 1;
 
-		//Code for userAnt behaviour
-
-		//Normalize position mod12
-		if(attemptedAntPosition == -1) attemptedAntPosition = 11;
-		else if(attemptedAntPosition == 12) attemptedAntPosition = 0;
+		// Make sure it goes in circle
+		normalizeAntPosition(attemptedAntPosition);
 
 		//Check whether position already occupied
 		toController <: attemptedAntPosition;
-		toController :> decider;
-		if(decider) {
+		toController :> moveForbidden;
+		if(moveForbidden) {
 			userAntPosition = attemptedAntPosition;
 			toVisualiser <: userAntPosition;
 		} else {
 			//BLNK LED
 		}
 
-	}
-}
-
-//ATTACKER PROCESS... The attacker is controlled by this process attackerAnt,
-// which has channels to the visualiser and controller
-void attackerAnt(chanend toVisualiser, chanend toController) {
-	//moves of attacker so far
-	int moveCounter = 0;
-
-	//the current attacker position
-	unsigned int attackerAntPosition = 5;
-	const unsigned int leastCommonMultiple = 49321;
-
-	unsigned int attemptedAntPosition; //the next attempted position after considering move direction
-	int currentDirection = 1; //the current direction the attacker is moving
-	int moveForbidden = 0; //the verdict of the controller if move is allowed
-	toVisualiser <: attackerAntPosition; //show initial position
-	while (1) {
-		////////////////////////////////////////////////////////////
-		//
-		// !!! place your code here for attacker behaviour
-		//
-		/////////////////////////////////////////////////////////////
-		if(moveCounter % 30)
-		waitMoment();
-
-		// Check if should change direction
-		if(shouldChangeDirection(moveCounter))
-			currentDirection = !currentDirection;
-
-		// To avoid overflow of move count
-		// use least common multiple of all three numbers
-		// to 'reset' the counter
-		if(moveCounter == leastCommonMultiple) moveCounter = 0;
 	}
 }
 
@@ -251,7 +226,86 @@ unsigned int shouldChangeDirection(int moveCount)
 			|| moveCount % 43 == 0);
 }
 
-//COLLISION DETECTOR... the controller process responds to Òpermission-to-moveÓ requests
+//ATTACKER PROCESS... The attacker is controlled by this process attackerAnt,
+// which has channels to the visualiser and controller
+void attackerAnt(chanend toVisualiser, chanend toController) {
+
+	// moves of attacker so far
+	int moveCounter = 0;
+
+	// current attacker position
+	unsigned int attackerAntPosition = 5;
+
+	// Least common multiple of 31, 37, 43
+	const unsigned int leastCommonMultiple = 49321;
+
+	// The next attempted position after considering move direction
+	unsigned int attemptedAntPosition = 0;
+
+	// The current direction the attacker is moving
+	int currentDirection = 1;
+
+	//the verdict of the controller if move is allowed
+	int moveForbidden = false;
+
+	// Show initial position
+	toVisualiser <: attackerAntPosition;
+
+	while (true) {
+		waitMoment();
+
+		// To avoid overflow of move count
+		// use least common multiple of all three numbers
+		// to 'reset' the counter
+		if(moveCounter == leastCommonMultiple) moveCounter = 0;
+
+		// Check if should change direction
+		if(shouldChangeDirection(moveCounter))
+			currentDirection = !currentDirection;
+
+		// Attempt new positon left or right based on current direction
+		if(currentDirection) attemptedAntPosition = attackerAntPosition + 1;
+		else attemptedAntPosition = attackerAntPosition - 1;
+
+		printf("I want to go to %d\n", attemptedAntPosition);
+		normalizeAntPosition(attemptedAntPosition);
+		printf("but i normalized %d\n", attemptedAntPosition);
+
+		//Check whether position already occupied
+		toController <: attemptedAntPosition;
+
+		// Get the reponse from controller
+		toController :> moveForbidden;
+
+		// If controller allowed, move!
+		if(moveForbidden) {
+			attackerAntPosition = attemptedAntPosition;
+			printf("Current attacker pos %d\n", attackerAntPosition);
+		} else {
+			printf("Cannot move. Change dir. Pos %d\n", attackerAntPosition);
+			// If attacker is next to the user and not allowed to move
+			// then change direction
+			currentDirection = !currentDirection;
+			// Move in oppsite direction than we wanted before
+			// Attempt new positon left or right based on current direction
+			if(currentDirection) attemptedAntPosition--;
+			else attemptedAntPosition++;
+			attackerAntPosition = attemptedAntPosition;
+		}
+
+		// Move Ant wherever it was decided
+		toVisualiser <: attackerAntPosition;
+
+		// Wait to slow down movements so the player moves
+		// In more or less same pace
+		waitMoment();
+
+		moveCounter++;
+	}
+}
+
+// COLLISION DETECTOR
+// the controller process responds to permission-to-move requests
 // from attackerAnt and userAnt. The process also checks if an attackerAnt
 // has moved to LED positions I, XII and XI.
 void controller(chanend fromAttacker, chanend fromUser) {
@@ -262,7 +316,7 @@ void controller(chanend fromAttacker, chanend fromUser) {
 	//position last reported by attackerAnt
 	unsigned int lastReportedAttackerAntPosition = 5;
 
-	//position last reported by attackerAnt
+	//position last reported by attackerAnt or userAnt
 	unsigned int attempt = 0;
 
 	//start game when user moves
@@ -271,14 +325,14 @@ void controller(chanend fromAttacker, chanend fromUser) {
 	//forbid first move
 	fromUser <: 1;
 
-	while (1) {
+	while (true) {
 		select {
 			case fromAttacker :> attempt:
-				/////////////////////////////////////////////////////////////
-				//
-				// !!! place your code here to give permission/deny attacker move or to end game
-				//
-				/////////////////////////////////////////////////////////////
+				//check whether attacker can move
+				if (attempt != lastReportedUserAntPosition) {
+					lastReportedAttackerAntPosition = attempt;
+					fromAttacker <: 1; //allow to move
+				} else fromAttacker <: 0; //do not allow to move
 				break;
 			case fromUser :> attempt:
 				//check whether user can move
@@ -290,7 +344,6 @@ void controller(chanend fromAttacker, chanend fromUser) {
 		}
 	}
 }
-
 
 //MAIN PROCESS defining channels, orchestrating and starting the processes
 int main(void) {
