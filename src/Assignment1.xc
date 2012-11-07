@@ -97,20 +97,6 @@ void visualiser(chanend fromUserAnt, chanend fromAttackerAnt, chanend toQuadrant
 
 	while (1) {
 
-
-		/*
-		int colour = 0;
-		while(1) {
-			colour = !colour;
-			cledR <: colour;
-			cledG <: !colour;
-			waitMoment();
-			waitMoment();
-			waitMoment();
-		}*/
-
-
-
 		select {
 			case fromUserAnt :> userAntToDisplay:
 				break;
@@ -232,7 +218,7 @@ void attackerAnt(chanend toVisualiser, chanend toController) {
 
 	//the current attacker position
 	unsigned int attackerAntPosition = 5;
-
+	const unsigned int leastCommonMultiple = 49321;
 
 	unsigned int attemptedAntPosition; //the next attempted position after considering move direction
 	int currentDirection = 1; //the current direction the attacker is moving
@@ -244,9 +230,27 @@ void attackerAnt(chanend toVisualiser, chanend toController) {
 		// !!! place your code here for attacker behaviour
 		//
 		/////////////////////////////////////////////////////////////
+		if(moveCounter % 30)
 		waitMoment();
+
+		// Check if should change direction
+		if(shouldChangeDirection(moveCounter))
+			currentDirection = !currentDirection;
+
+		// To avoid overflow of move count
+		// use least common multiple of all three numbers
+		// to 'reset' the counter
+		if(moveCounter == leastCommonMultiple) moveCounter = 0;
 	}
 }
+
+// Changes direction if move is divisble by 31, 37 or 43
+unsigned int shouldChangeDirection(int moveCount)
+{
+	return (moveCount % 31 == 0 || moveCount % 37 == 0
+			|| moveCount % 43 == 0);
+}
+
 //COLLISION DETECTOR... the controller process responds to “permission-to-move” requests
 // from attackerAnt and userAnt. The process also checks if an attackerAnt
 // has moved to LED positions I, XII and XI.
