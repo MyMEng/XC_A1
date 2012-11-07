@@ -66,6 +66,8 @@ out port speaker = PORT_SPEAKER;
 
 
 int mario[2][14] = {{660, 0,   660, 0,   660, 0, 510, 0,   660, 0,   770, 0,   380, 0}, {100, 150, 100, 300, 100, 300,   100, 100, 100, 300, 100, 550, 100, 575}};
+void waitMoment();
+
 /////////////////////////////////////////////////////////////////////////////////////////
 //
 // Helper Functions provided for you
@@ -89,8 +91,26 @@ void visualiser(chanend fromUserAnt, chanend fromAttackerAnt, chanend toQuadrant
 	unsigned int attackerAntToDisplay = 5;
 
 	int i, j;
+
 	cledR <: 1;
+
+
 	while (1) {
+
+
+		/*
+		int colour = 0;
+		while(1) {
+			colour = !colour;
+			cledR <: colour;
+			cledG <: !colour;
+			waitMoment();
+			waitMoment();
+			waitMoment();
+		}*/
+
+
+
 		select {
 			case fromUserAnt :> userAntToDisplay:
 				break;
@@ -113,7 +133,7 @@ void playSound(unsigned int wavelength, out port speaker, int timePeriod) {
 	int t, isOn = 1, i;
 	tmr :> t;
 
-	for (i = 0; i< timePeriod; i++) { //to s milisekundy
+	for (i = 0; i< timePeriod; i++) {
 		isOn = !isOn;
 		t += wavelength;
 		tmr when timerafter(t) :> void;
@@ -124,33 +144,29 @@ void playSound(unsigned int wavelength, out port speaker, int timePeriod) {
 //READ BUTTONS and send to userAnt
 void buttonListener(in port b, out port spkr, chanend toUserAnt) {
 	int r;
-	int muteSound = 1;
+	int muteSound = 0;
 	while (1) {
-
 		// check if some buttons are pressed
 		b when pinsneq(15) :> r;
 
 		//mute sound feature
-		if (r == buttonB) muteSound = !(muteSound);
-
-
-		// play sound
-		if (!muteSound)
-		{
-			int i = FRQ_A;
-			for(int c = 0 ; c < 2; c++) {
-				//int a = mario[0][c];
-				//int b = mario[1][c];
-				playSound(i, spkr, 100);
-				i = i + 1000;
-			}
+		if (r == buttonB) {
+			muteSound = ~muteSound;
 		}
 
-		//playSound(0, spkr, 1000);
-		//playSound(99999, spkr, 1500);
-		//playSound(6600, spkr, 1000);
-		//playSound(66000, spkr, 3000);
-		//playSound(6600, spkr, 1000);
+		waitMoment();
+
+		// play sound
+		if (muteSound == 0) {
+			//int i = FRQ_A;
+			//int i = 20000;
+			//for(int c = 0 ; c < 2; c++) {
+				//int a = mario[0][c];
+				//int b = mario[1][c];
+				playSound(20000, spkr, 100);
+				//i = i + 1000;
+			//}
+		}
 
 		// send button pattern to userAnt
 		toUserAnt <: r;
@@ -161,6 +177,7 @@ void buttonListener(in port b, out port spkr, chanend toUserAnt) {
 void waitMoment() {
 	timer tmr;
 	int waitTime;
+	tmr :> waitTime;
 	waitTime += 8000000;
 	tmr when timerafter(waitTime) :> void;
 }
@@ -177,22 +194,33 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
 	int buttonInput; //the input pattern from the buttonListener
 	unsigned int attemptedAntPosition = 0; //the next attempted defender position after considering button
 	int moveForbidden; //the verdict of the controller if move is allowed
+
+	unsigned int decider; //if 1 allow to move otherwise forbid
+
 	toVisualiser <: userAntPosition; //show initial position
 
+
 	while (1) {
-		//B 13 | C 11
 		fromButtons :> buttonInput;
 		if (buttonInput == buttonA) attemptedAntPosition = userAntPosition + 1;
 		if (buttonInput == buttonD) attemptedAntPosition = userAntPosition - 1;
 
+		//Code for userAnt behaviour
 
-		userAntPosition = attemptedAntPosition;
-		toVisualiser <: userAntPosition;
-		////////////////////////////////////////////////////////////
-		//
-		// !!! place code here for userAnt behaviour
-		//
-		/////////////////////////////////////////////////////////////
+		//Normalize position mod12
+		if(attemptedAntPosition == -1) attemptedAntPosition = 11;
+		else if(attemptedAntPosition == 12) attemptedAntPosition = 0;
+
+		//Check whether position already occupied
+		toController <: attemptedAntPosition;
+		toController :> decider;
+		if(decider) {
+			userAntPosition = attemptedAntPosition;
+			toVisualiser <: userAntPosition;
+		} else {
+			//BLNK LED
+		}
+
 	}
 }
 
@@ -249,11 +277,11 @@ void controller(chanend fromAttacker, chanend fromUser) {
 				/////////////////////////////////////////////////////////////
 				break;
 			case fromUser :> attempt:
-				/////////////////////////////////////////////////////////////
-				//
-				// !!! place your code here to give permission/deny user move
-				//
-				/////////////////////////////////////////////////////////////
+				//check whether user can move
+				if (attempt != lastReportedAttackerAntPosition) {
+					lastReportedUserAntPosition = attempt;
+					fromUser <: 1; //allow to move
+				} else fromUser <: 0; //do not allow to move
 				break;
 		}
 	}
