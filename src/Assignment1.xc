@@ -148,6 +148,7 @@ void buttonListener(in port b, out port spkr, chanend toUserAnt) {
 		// Wait to slow down movements when buttons are pressed
 		waitMoment();
 
+
 		// play sound
 		if (muteSound == 0) {
 			//int i = FRQ_A;
@@ -216,6 +217,8 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
 			//BLNK LED
 		}
 
+		//printf("userANT %d\n", userAntPosition);
+
 	}
 }
 
@@ -268,9 +271,13 @@ void attackerAnt(chanend toVisualiser, chanend toController) {
 		if(currentDirection) attemptedAntPosition = attackerAntPosition + 1;
 		else attemptedAntPosition = attackerAntPosition - 1;
 
-		printf("I want to go to %d\n", attemptedAntPosition);
+
+
+		//printf("Pos BEFORE norm %d\n", attackerAntPosition);
+
+		//printf("I want to go to %d\n", attemptedAntPosition);
 		normalizeAntPosition(attemptedAntPosition);
-		printf("but i normalized %d\n", attemptedAntPosition);
+		//printf("but i normalized %d\n", attemptedAntPosition);
 
 		//Check whether position already occupied
 		toController <: attemptedAntPosition;
@@ -278,23 +285,33 @@ void attackerAnt(chanend toVisualiser, chanend toController) {
 		// Get the reponse from controller
 		toController :> moveForbidden;
 
+
+		//printf("Pos BEFORE %d\n", attackerAntPosition);
+
+
 		// If controller allowed, move!
 		if(moveForbidden) {
 			attackerAntPosition = attemptedAntPosition;
-			printf("Current attacker pos %d\n", attackerAntPosition);
+			//printf("Current attacker pos %d\n", attackerAntPosition);
 		} else {
-			printf("Cannot move. Change dir. Pos %d\n", attackerAntPosition);
-
-			// Move in oppsite direction than we wanted before
-			// Attempt new positon left or right based on current direction
-
-			if(currentDirection) attemptedAntPosition = attackerAntPosition - 1;
-			else attemptedAntPosition = attackerAntPosition + 1;
-			attackerAntPosition = attemptedAntPosition;
+			//printf("Cannot move. Change dir. Pos %d\n", attackerAntPosition);
+			//printf("Position blocked\n");
+			//printf("Pos %d\n", attackerAntPosition);
 
 			// If attacker is next to the user and not allowed to move
 			// then change direction
 			currentDirection = !currentDirection;
+
+			// Move in oppsite direction than we wanted before
+			// Attempt new positon left or right based on current direction
+			if(currentDirection) attemptedAntPosition = attackerAntPosition + 1;
+			else attemptedAntPosition = attackerAntPosition - 1;
+
+			//printf("notnorm:%d\n", attemptedAntPosition);
+			normalizeAntPosition(attemptedAntPosition);
+			///printf("norm:%d\n", attemptedAntPosition);
+
+			attackerAntPosition = attemptedAntPosition;
 		}
 
 		// Move Ant wherever it was decided
@@ -325,6 +342,8 @@ void controller(chanend fromAttacker, chanend fromUser) {
 
 	//start game when user moves
 	fromUser :> attempt;
+	//and remember its position
+	lastReportedUserAntPosition = attempt;
 
 	//forbid first move
 	fromUser <: 1;
@@ -342,8 +361,10 @@ void controller(chanend fromAttacker, chanend fromUser) {
 				//check whether user can move
 				if (attempt != lastReportedAttackerAntPosition) {
 					lastReportedUserAntPosition = attempt;
+					//printf("controller user position %d\n", lastReportedUserAntPosition);
 					fromUser <: 1; //allow to move
 				} else fromUser <: 0; //do not allow to move
+				//printf("controller user position %d\n", lastReportedUserAntPosition);
 				break;
 		}
 	}

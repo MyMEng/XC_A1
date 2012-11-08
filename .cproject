@@ -234,11 +234,11 @@
                                 </option>
                                 <inputType id="com.xmos.cdt.xc.compiler.input.1900886246" name="XC Sources" superClass="com.xmos.cdt.xc.compiler.input" />
                             </tool>
-                            <tool id="com.xmos.cdt.c.compiler.468919714" name="com.xmos.cdt.c.compiler" superClass="com.xmos.cdt.c.compiler">
-                                <inputType id="com.xmos.cdt.c.compiler.input.c.985680359" name="C" superClass="com.xmos.cdt.c.compiler.input.c" />
+                            <tool id="com.xmos.cdt.c.compiler.468919714" name="com.xmos.cdt.c.compiler">
+                                <inputType id="com.xmos.cdt.c.compiler.input.c.985680359" name="C" />
                             </tool>
-                            <tool id="com.xmos.cdt.cxx.compiler.2123173435" name="com.xmos.cdt.cxx.compiler" superClass="com.xmos.cdt.cxx.compiler">
-                                <inputType id="com.xmos.cdt.cxx.compiler.input.cpp.70067032" name="C++" superClass="com.xmos.cdt.cxx.compiler.input.cpp" />
+                            <tool id="com.xmos.cdt.cxx.compiler.2123173435" name="com.xmos.cdt.cxx.compiler">
+                                <inputType id="com.xmos.cdt.cxx.compiler.input.cpp.70067032" name="C++" />
                             </tool>
                             <tool id="com.xmos.cdt.xc.compiler.base.11111" name="com.xmos.cdt.xc.compiler.base" superClass="com.xmos.cdt.xc.compiler.base">
                                 <option id="gnu.c.compiler.option.include.paths.11111" valueType="includePath" superClass="gnu.c.compiler.option.include.paths">
