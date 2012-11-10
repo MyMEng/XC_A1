@@ -26,24 +26,14 @@
 // attacker's path.
 //
 // Defender Ant
-// The user controls one “LED Ant” by pressing either button A (moving
-// The user controls one “LED Ant” by pressing either button A (moving
-// The user controls one “LED Ant” by pressing either button A (moving
-// The user controls one “LED Ant” by pressing either button A (moving
-// The user controls one “LED Ant” by pressing either button A (moving
-// The user controls one “LED Ant” by pressing either button A (moving
-// The user controls one “LED Ant” by pressing either button A (moving
-// The user controls one “LED Ant” by pressing either button A (moving
-// The user controls one “LED Ant” by pressing either button A (moving
-// The user controls one “LED Ant” by pressing either button A (moving
-// The user controls one “LED Ant” by pressing either button A (moving
+// The user controls one LED Ant by pressing either button A (moving
 // 1 position clockwise) or button D (moving 1 position anti-clockwise).
 // The defender ant can only move to a position that is not already occupied
 // by the attacker ant. The defender’s starting position is LED XII. A sound
 // is played when the user presses a button.
 //
 // Attacker Ant
-// A second “LED Ant” is controlled by the system and starts at LED position VI.
+// A second LED Ant is controlled by the system and starts at LED position VI.
 // It then attempts moving in one direction (either clockwise or anti-clockwise).
 // This attempt is denied if the defender ant is already located there, in this
 // case the attacker ant changes direction. To make the game more interesting:
@@ -55,6 +45,7 @@
 #include <stdio.h>
 #include <platform.h>
 
+// Leds, buttons and speaker ports
 out port cled0 = PORT_CLOCKLED_0;
 out port cled1 = PORT_CLOCKLED_1;
 out port cled2 = PORT_CLOCKLED_2;
@@ -78,10 +69,22 @@ out port speaker = PORT_SPEAKER;
 typedef unsigned int bool;
 #define true 1
 #define false 0
+
+// Define delays
+#define LEDDELAY 100000
+#define DEFAULTDELAY 8000000
+// Game lost signal
 #define GAMELOST 1337
 
+// Initial user and attacker positions
+#define USERINITIALPOS 11
+#define ATTACKERINITIALPOS 5
+
 int mario[2][14] = {{660, 0,   660, 0,   660, 0, 510, 0,   660, 0,   770, 0,   380, 0}, {100, 150, 100, 300, 100, 300,   100, 100, 100, 300, 100, 550, 100, 575}};
+
+// Forward declare waitMoment
 void waitMoment();
+void waitMomentCustom(int delay);
 
 /////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -102,30 +105,59 @@ int showLED(out port p, chanend fromVisualiser) {
 //PROCESS TO COORDINATE DISPLAY of LED Ants
 void visualiser(chanend fromUserAnt, chanend fromAttackerAnt, chanend toQuadrant0, chanend toQuadrant1, chanend
 		toQuadrant2, chanend toQuadrant3) {
-	unsigned int userAntToDisplay = 11;
-	unsigned int attackerAntToDisplay = 5;
+
+	unsigned int userAntToDisplay = USERINITIALPOS;
+	unsigned int attackerAntToDisplay = ATTACKERINITIALPOS;
     unsigned int terminationCode = 0;
-	int i, j;
-	bool isOn;
+    unsigned int q0, q1, q2, q3;
+	int i, j, k;
+	// Timer variables
+	unsigned int t = 0, t0 = 0;
+	timer tmr;
 
-	cledR <: 1;
-
+	// Green may be always on, we need to alternate red led color
+	cledG <: true;
+	cledR <: false;
 
 	while (true) {
 
+		// Update positions, otherwise only quickly
+		// 'blink' current positions to have two colors
 		select {
 			case fromUserAnt :> userAntToDisplay:
 				break;
 			case fromAttackerAnt :> attackerAntToDisplay:
 				break;
+			default:
+				break;
 		}
 
-		j = 16<<(userAntToDisplay%3);
-		i = 16<<(attackerAntToDisplay%3);
-		toQuadrant0 <: (j*(userAntToDisplay/3==0)) + (i*(attackerAntToDisplay/3==0)) ;
-		toQuadrant1 <: (j*(userAntToDisplay/3==1)) + (i*(attackerAntToDisplay/3==1)) ;
-		toQuadrant2 <: (j*(userAntToDisplay/3==2)) + (i*(attackerAntToDisplay/3==2)) ;
-		toQuadrant3 <: (j*(userAntToDisplay/3==3)) + (i*(attackerAntToDisplay/3==3)) ;
+		// Position in a quadrant is encoded as multiple of 16:
+		// 16 - first led, 32, second led, 48 - first end second, 64 - third etc.
+		j =  16<<(userAntToDisplay%3);
+		i =  16<<(attackerAntToDisplay%3);
+
+		// Switch off red, green should be light up now
+		cledR <: false;
+
+		// First display user ant, then quickly display attacker
+		toQuadrant0 <: (j*(userAntToDisplay/3==0));
+		toQuadrant1 <: (j*(userAntToDisplay/3==1));
+		toQuadrant2 <: (j*(userAntToDisplay/3==2));
+		toQuadrant3 <: (j*(userAntToDisplay/3==3));
+
+		// Wait to make red led visible
+		waitMomentCustom(LEDDELAY);
+
+		// Switch LED color
+		cledR <: true;
+		toQuadrant0 <: (i*(attackerAntToDisplay/3==0));
+		toQuadrant1 <: (i*(attackerAntToDisplay/3==1));
+		toQuadrant2 <: (i*(attackerAntToDisplay/3==2));
+		toQuadrant3 <: (i*(attackerAntToDisplay/3==3));
+
+		// Wait to make green led visible
+		waitMomentCustom(LEDDELAY);
 	}
 }
 
@@ -145,53 +177,50 @@ void playSound(unsigned int wavelength, out port speaker, int timePeriod) {
 
 //READ BUTTONS and send to userAnt
 void buttonListener(in port b, out port spkr, chanend toUserAnt) {
-	int r;
-	int muteSound = 0;
+	int r = 0;
+	bool muteSound = false;
 
 	while (true) {
 		// check if some buttons are pressed
 		b when pinsneq(15) :> r;
 
 		//mute sound feature
-		if (r == buttonB) {
-			muteSound = ~muteSound;
-		}
+		if (r == buttonB)
+			muteSound = !muteSound;
 
 		// Wait to slow down movements when buttons are pressed
 		waitMoment();
 
-
 		// play sound
-		if (muteSound == 0) {
-			//int i = FRQ_A;
-			//int i = 20000;
-			//for(int c = 0 ; c < 2; c++) {
-				//int a = mario[0][c];
-				//int b = mario[1][c];
-				playSound(20000, spkr, 100);
-				//i = i + 1000;
-			//}
-		}
+		if (!muteSound)
+			playSound(20000, spkr, 100);
 
 		// send button pattern to userAnt
 		toUserAnt <: r;
 	}
 }
 
-//WAIT function
-void waitMoment() {
+// WAIT function
+// Allow to specify delay
+void waitMomentCustom(int delay) {
 	timer tmr;
 	int waitTime;
 	tmr :> waitTime;
-	waitTime += 8000000;
+	waitTime += delay;
 	tmr when timerafter(waitTime) :> void;
+}
+
+// Use default delay
+void waitMoment() {
+	waitMomentCustom(DEFAULTDELAY);
 }
 
 // Make mouse position not exceeding certain values
 // so that it moves in a circle
 void normalizeAntPosition(unsigned int& antPosition)
 {
-	//Normalize position when mod 12 == 0
+	// Normalize position when mod 12 == 0
+	// Two cases depending on direction of move
 	if(antPosition == -1 ) antPosition = 11;
 	else if(antPosition == 12) antPosition = 0;
 }
@@ -199,41 +228,70 @@ void normalizeAntPosition(unsigned int& antPosition)
 //DEFENDER PROCESS... The defender is controlled by this process userAnt,
 //which has channels to a buttonListener, visualiser and controller
 void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
-	unsigned int userAntPosition = 11; //the current defender position
-	int buttonInput; //the input pattern from the buttonListener
-	unsigned int attemptedAntPosition = 0; //the next attempted defender position after considering button
 
-	//the verdict of the controller if move is allowed
-	int moveForbidden = false;
+	// Loop to keep the game going
+	while(true) {
+		//the current defender position
+		unsigned int userAntPosition = USERINITIALPOS;
 
-	toVisualiser <: userAntPosition; //show initial position
+		//the input pattern from the buttonListener
+		int buttonInput = 0;
 
-	//Code for userAnt behaviour
-	while (true) {
+		//the next attempted defender position after considering button
+		unsigned int attemptedAntPosition = 0;
 
-		// See what buttons are pressed and attempt to move left or right
-		fromButtons :> buttonInput;
-		if (buttonInput == buttonA) attemptedAntPosition = userAntPosition + 1;
-		if (buttonInput == buttonD) attemptedAntPosition = userAntPosition - 1;
+		//the verdict of the controller if move is allowed
+		int moveAllowed = false;
+		int isEnd = false;
 
-		// Make sure it goes in circle
-		normalizeAntPosition(attemptedAntPosition);
+		// Report initial position
+		toVisualiser <: userAntPosition;
 
-		//Check whether position already occupied
-		toController <: attemptedAntPosition;
-		toController :> moveForbidden;
+		waitMoment();
 
-		// Check if the game is still going on... get out of loop if needed
-		if(moveForbidden == GAMELOST)
-		{
-			printf("User ant got GAMELOST sig.");
-			break;
-		}
-		if(moveForbidden) {
-			userAntPosition = attemptedAntPosition;
-			toVisualiser <: userAntPosition;
-		} else {
-			//BLNK LED
+		// Code for userAnt behaviour
+		while (true) {
+
+			buttonInput = -1;
+			// See what buttons are pressed and attempt to move left or right
+			select {
+				case fromButtons :> buttonInput:
+					break;
+				case toController :> isEnd:
+					isEnd = (isEnd == GAMELOST);
+					break;
+				//default:
+				//	break;
+			}
+
+			// Check if the game is still going on... restart loop if game over
+			if(isEnd == true)
+			{
+				printf("User ant game lost\n");
+				waitMoment();
+				// Exit the inner loop, re-initialize variables
+				break;
+			}
+
+			//if (buttonInput == buttonC) isPaused = !isPaused;
+			if (buttonInput == buttonA) attemptedAntPosition = userAntPosition + 1;
+			if (buttonInput == buttonD) attemptedAntPosition = userAntPosition - 1;
+			// if buttonInput = -1;
+			//else attemptedAntPosition = userAntPosition;
+
+			// Make sure it goes in circle
+			normalizeAntPosition(attemptedAntPosition);
+
+			//Check whether position already occupied
+			toController <: attemptedAntPosition;
+			toController :> moveAllowed;
+
+			if(moveAllowed == true) {
+				userAntPosition = attemptedAntPosition;
+				toVisualiser <: userAntPosition;
+			} else {
+				//BLNK LED
+			}
 		}
 	}
 }
@@ -245,89 +303,91 @@ unsigned int shouldChangeDirection(int moveCount)
 			|| moveCount % 43 == 0);
 }
 
-
 //ATTACKER PROCESS... The attacker is controlled by this process attackerAnt,
 // which has channels to the visualiser and controller
 void attackerAnt(chanend toVisualiser, chanend toController) {
 
-	// moves of attacker so far
-	int moveCounter = 0;
+	// Loop to keep the game going
+	while(true) {
+		// moves of attacker so far
+		int moveCounter = 0;
 
-	// current attacker position
-	unsigned int attackerAntPosition = 5;
+		// current attacker position
+		unsigned int attackerAntPosition = ATTACKERINITIALPOS;
 
-	// Least common multiple of 31, 37, 43
-	const unsigned int leastCommonMultiple = 49321;
+		// Least common multiple of 31, 37, 43
+		const unsigned int leastCommonMultiple = 49321;
 
-	// The next attempted position after considering move direction
-	unsigned int attemptedAntPosition = 0;
+		// The next attempted position after considering move direction
+		unsigned int attemptedAntPosition = 0;
 
-	// The current direction the attacker is moving
-	int currentDirection = 1;
+		// The current direction the attacker is moving
+		int currentDirection = 1;
 
-	//the verdict of the controller if move is allowed
-	int moveForbidden = false;
+		//the verdict of the controller if move is allowed
+		bool moveAllowed = false;
 
-	// Show initial position
-	toVisualiser <: attackerAntPosition;
+		// Show initial position
+		toVisualiser <: attackerAntPosition;
 
-	while (true) {
-		waitMoment();
+		while (true) {
+			waitMoment();
 
-		// To avoid overflow of move count
-		// use least common multiple of all three numbers
-		// to 'reset' the counter
-		if(moveCounter == leastCommonMultiple) moveCounter = 0;
+			// To avoid overflow of move count
+			// use least common multiple of all three numbers
+			// to 'reset' the counter
+			if(moveCounter == leastCommonMultiple) moveCounter = 0;
 
-		// Check if should change direction
-		if(shouldChangeDirection(moveCounter))
-			currentDirection = !currentDirection;
+			// Check if should change direction
+			if(shouldChangeDirection(moveCounter))
+				currentDirection = !currentDirection;
 
-		// Attempt new positon left or right based on current direction
-		if(currentDirection) attemptedAntPosition = attackerAntPosition + 1;
-		else attemptedAntPosition = attackerAntPosition - 1;
-
-		normalizeAntPosition(attemptedAntPosition);
-
-		//Check whether position already occupied
-		toController <: attemptedAntPosition;
-
-		// Get the reponse from controller
-		toController :> moveForbidden;
-
-
-		// If controller allowed, move!
-		if(moveForbidden) {
-			attackerAntPosition = attemptedAntPosition;
-		} else {
-			// If attacker is next to the user and not allowed to move
-			// then change direction
-			currentDirection = !currentDirection;
-
-			// Move in oppsite direction than we wanted before
 			// Attempt new positon left or right based on current direction
 			if(currentDirection) attemptedAntPosition = attackerAntPosition + 1;
 			else attemptedAntPosition = attackerAntPosition - 1;
+
 			normalizeAntPosition(attemptedAntPosition);
 
-			attackerAntPosition = attemptedAntPosition;
+			//Check whether position already occupied
+			toController <: attemptedAntPosition;
+
+			// Get the reponse from controller
+			toController :> moveAllowed;
+
+			// If controller allowed, move!
+			if(moveAllowed == true) {
+				attackerAntPosition = attemptedAntPosition;
+			}
+			// Check if the game is still going on... get out of loop if needed
+			else if(moveAllowed == GAMELOST) {
+				// Make sure last 'winning' position is shown
+				toVisualiser <: attemptedAntPosition;
+				printf("Attacker ant game lost\n");
+				waitMoment();
+				// Break the inner loop, reinitialize variables, restart the game
+				break;
+			} else {
+				// If attacker is next to the user and not allowed to move
+				// then change direction
+				currentDirection = !currentDirection;
+
+				// Move in oppsite direction than we wanted before
+				// Attempt new positon left or right based on current direction
+				if(currentDirection) attemptedAntPosition = attackerAntPosition + 1;
+				else attemptedAntPosition = attackerAntPosition - 1;
+				normalizeAntPosition(attemptedAntPosition);
+				attackerAntPosition = attemptedAntPosition;
+			}
+\
+			// Move Ant wherever it was decided
+			toVisualiser <: attackerAntPosition;
+
+			// Wait to slow down movements so the player moves
+			// In more or less same pace
+			waitMoment();
+
+			moveCounter++;
 		}
-
-		// Move Ant wherever it was decided
-		toVisualiser <: attackerAntPosition;
-
-		// Check if the game is still going on... get out of loop if needed
-		if(moveForbidden == GAMELOST)
-		{
-			printf("User ant got GAMELOST sig.");
-			break;
-		}
-
-		// Wait to slow down movements so the player moves
-		// In more or less same pace
-		waitMoment();
-
-		moveCounter++;
 	}
 }
 
@@ -337,54 +397,73 @@ void attackerAnt(chanend toVisualiser, chanend toController) {
 // has moved to LED positions I, XII and XI.
 void controller(chanend fromAttacker, chanend fromUser) {
 
-	//position last reported by userAnt
-	unsigned int lastReportedUserAntPosition = 11;
+	// Loop to keep the game going
+	while(true) {
 
-	//position last reported by attackerAnt
-	unsigned int lastReportedAttackerAntPosition = 5;
+		// is game finished?
+		bool isEnd = false;
 
-	//position last reported by attackerAnt or userAnt
-	unsigned int attempt = 0;
+		//position last reported by userAnt
+		unsigned int lastReportedUserAntPosition = 11;
 
-	//start game when user moves
-	fromUser :> attempt;
-	//and remember its position
-	lastReportedUserAntPosition = attempt;
+		//position last reported by attackerAnt
+		unsigned int lastReportedAttackerAntPosition = 5;
 
-	//forbid first move
-	fromUser <: 1;
+		//position last reported by attackerAnt or userAnt
+		unsigned int attempt = 0;
 
-	while (true) {
-		select {
-			case fromAttacker :> attempt:
-				//check whether attacker can move
-				if (attempt != lastReportedUserAntPosition) {
-					lastReportedAttackerAntPosition = attempt;
+		printf("Start of new game\n");
 
-					// Check if the game is over - attacker occupied one of 'defened' positions
-					if(lastReportedAttackerAntPosition == 10 || lastReportedAttackerAntPosition == 11
+		//start game when user moves
+		fromUser :> attempt;
+		//and remember its position
+		lastReportedUserAntPosition = attempt;
+
+		//forbid first move
+		fromUser <: 1;
+
+		while (true) {
+			select {
+				case fromAttacker :> attempt:
+					//check whether attacker can move
+					if (attempt != lastReportedUserAntPosition) {
+						lastReportedAttackerAntPosition = attempt;
+
+						// Check if the game is over - attacker occupied one of 'defened' positions
+						if(lastReportedAttackerAntPosition == 10
+							|| lastReportedAttackerAntPosition == 11
 							|| lastReportedAttackerAntPosition == 0) {
 
 							// Send a 'game over' signal to attacker and user
+							waitMoment();
 							fromAttacker <: GAMELOST;
 							fromUser <: GAMELOST;
+							isEnd = true;
 							break;
 						}
 
-					fromAttacker <: 1; //allow to move
-				} else fromAttacker <: 0; //do not allow to move
-				break;
-			case fromUser :> attempt:
-				//check whether user can move
-				if (attempt != lastReportedAttackerAntPosition) {
-					lastReportedUserAntPosition = attempt;
-					fromUser <: 1; //allow to move
-				} else {
-					fromUser <: 0; //do not allow to move
+						fromAttacker <: 1; //allow to move
+					} else fromAttacker <: 0; //do not allow to move
+					break;
+				case fromUser :> attempt:
+					//check whether user can move
+					if (attempt != lastReportedAttackerAntPosition) {
+						lastReportedUserAntPosition = attempt;
+						fromUser <: 1; //allow to move
+					} else {
+						fromUser <: 0; //do not allow to move
+					}
+					break;
 				}
-				break;
+
+				if(isEnd) {
+					printf("Restarting controller\n");
+					waitMoment();
+					// Break controller inner loop and restart
+					break;
+				}
 			}
-		}
+	}
 }
 
 //MAIN PROCESS defining channels, orchestrating and starting the processes
