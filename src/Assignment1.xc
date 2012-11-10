@@ -52,6 +52,9 @@ out port cled2 = PORT_CLOCKLED_2;
 out port cled3 = PORT_CLOCKLED_3;
 out port cledG = PORT_CLOCKLED_SELG;
 out port cledR = PORT_CLOCKLED_SELR;
+
+// Port for buttons' leds
+out port buttonLed = PORT_BUTTONLED;
 in port buttons = PORT_BUTTON;
 out port speaker = PORT_SPEAKER;
 
@@ -178,18 +181,27 @@ void playSound(unsigned int wavelength, out port speaker, int timePeriod) {
 //READ BUTTONS and send to userAnt
 void buttonListener(in port b, out port spkr, chanend toUserAnt) {
 	int r = 0;
-	bool muteSound = false;
+	bool muteSound = false, pause = false;
 
 	while (true) {
 		// check if some buttons are pressed
 		b when pinsneq(15) :> r;
 
-		//mute sound feature
-		if (r == buttonB)
-			muteSound = !muteSound;
+		switch(r){
+			case buttonB:
+				// Toogle mute sound
+				muteSound = !muteSound;
+				break;
+			case buttonC:
+				// Toogle pause
+				pause = !pause;
+				break;
+		}
 
 		// Wait to slow down movements when buttons are pressed
 		waitMoment();
+
+		buttonLed <: (2 * muteSound) + (4 * pause); ;
 
 		// play sound
 		if (!muteSound)
@@ -273,9 +285,9 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
 
 			//if (buttonInput == buttonC) isPaused = !isPaused;
 			if (buttonInput == buttonA) attemptedAntPosition = userAntPosition + 1;
-			if (buttonInput == buttonD) attemptedAntPosition = userAntPosition - 1;
-			// if buttonInput = -1;
-			//else attemptedAntPosition = userAntPosition;
+			else if (buttonInput == buttonD) attemptedAntPosition = userAntPosition - 1;
+			else
+				continue; // Don't attempt anything on other buttons
 
 			// Make sure it goes in circle
 			normalizeAntPosition(attemptedAntPosition);
