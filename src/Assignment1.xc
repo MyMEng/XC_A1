@@ -256,20 +256,18 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
 			// See what buttons are pressed and attempt to move left or right
 			select {
 				case fromButtons :> buttonInput:
+					// Prevent from listenting buttons
+					if(isEnd == true)
+						continue;
 					break;
 				case toController :> isEnd:
 					isEnd = (isEnd == GAMELOST);
 					break;
-				//default:
-				//	break;
 			}
 
 			// Check if the game is still going on... restart loop if game over
 			if(isEnd == true)
 			{
-				printf("User ant game lost\n");
-				waitMoment();
-				// Exit the inner loop, re-initialize variables
 				break;
 			}
 
@@ -284,8 +282,17 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
 
 			//Check whether position already occupied
 			toController <: attemptedAntPosition;
+
+			// Wait for response
 			toController :> moveAllowed;
 
+			//printf("GOT FROM CONTROLLER\n");
+			if(moveAllowed == GAMELOST)
+			{
+				printf("After buttno pressed: GAMELOST\n");
+				isEnd = true;
+				break;
+			}
 			if(moveAllowed == true) {
 				userAntPosition = attemptedAntPosition;
 				toVisualiser <: userAntPosition;
@@ -362,8 +369,7 @@ void attackerAnt(chanend toVisualiser, chanend toController) {
 			else if(moveAllowed == GAMELOST) {
 				// Make sure last 'winning' position is shown
 				toVisualiser <: attemptedAntPosition;
-				printf("Attacker ant game lost\n");
-				waitMoment();
+				//printf("Attacker ant game lost\n");
 				// Break the inner loop, reinitialize variables, restart the game
 				break;
 			} else {
@@ -412,7 +418,7 @@ void controller(chanend fromAttacker, chanend fromUser) {
 		//position last reported by attackerAnt or userAnt
 		unsigned int attempt = 0;
 
-		printf("Start of new game\n");
+		//printf("Start of new game\n");
 
 		//start game when user moves
 		fromUser :> attempt;
@@ -435,9 +441,7 @@ void controller(chanend fromAttacker, chanend fromUser) {
 							|| lastReportedAttackerAntPosition == 0) {
 
 							// Send a 'game over' signal to attacker and user
-							waitMoment();
 							fromAttacker <: GAMELOST;
-							fromUser <: GAMELOST;
 							isEnd = true;
 							break;
 						}
@@ -457,8 +461,9 @@ void controller(chanend fromAttacker, chanend fromUser) {
 				}
 
 				if(isEnd) {
-					printf("Restarting controller\n");
+					fromUser <: GAMELOST;
 					waitMoment();
+					//printf("Restarting controller\n");
 					// Break controller inner loop and restart
 					break;
 				}
