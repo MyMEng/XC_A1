@@ -199,7 +199,7 @@ void buttonListener(in port b, out port spkr, chanend toUserAnt) {
 		}
 
 		// Wait to slow down movements when buttons are pressed
-		waitMoment();
+		waitMomentCustom(DEFAULTDELAY*2);
 
 		buttonLed <: (2 * muteSound) + (4 * pause); ;
 
@@ -286,6 +286,26 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
 			//if (buttonInput == buttonC) isPaused = !isPaused;
 			if (buttonInput == buttonA) attemptedAntPosition = userAntPosition + 1;
 			else if (buttonInput == buttonD) attemptedAntPosition = userAntPosition - 1;
+			else if (buttonInput == buttonC){
+				// Handle pause:
+				toController <: 1024;
+
+				while(true) {
+					bool endPause = false;
+					select {
+						case fromButtons :> buttonInput:
+							if(buttonInput == buttonC) {
+								endPause = true;
+								toController <: 1023;
+							}
+							break;
+						default:
+							break;
+					}
+					if(endPause)
+						break;
+				}
+			}
 			else
 				continue; // Don't attempt anything on other buttons
 
@@ -344,13 +364,24 @@ void attackerAnt(chanend toVisualiser, chanend toController) {
 		int currentDirection = 1;
 
 		//the verdict of the controller if move is allowed
-		bool moveAllowed = false;
-
+		bool moveAllowed = false, paused = false;
+		int pauseCode = 0;
 		// Show initial position
 		toVisualiser <: attackerAntPosition;
 
 		while (true) {
 			waitMoment();
+
+			select {
+				case toController :> pauseCode:
+					if(pauseCode == 1023) paused = false;
+					else if(pauseCode == 1024) paused = true;
+					break;
+				default:
+					break;
+			}
+
+			if(paused) continue;
 
 			// To avoid overflow of move count
 			// use least common multiple of all three numbers
@@ -463,10 +494,17 @@ void controller(chanend fromAttacker, chanend fromUser) {
 					break;
 				case fromUser :> attempt:
 					//check whether user can move
-					if (attempt != lastReportedAttackerAntPosition) {
+					if(attempt == 1023) {
+						// Resumed from user -> Resume attacker
+						fromAttacker <: 1023;
+					} else if(attempt == 1024) {
+						// User is paused -> Pause attacker
+						fromAttacker <: 1024;
+					} else if (attempt != lastReportedAttackerAntPosition) {
 						lastReportedUserAntPosition = attempt;
 						fromUser <: 1; //allow to move
 					} else {
+
 						fromUser <: 0; //do not allow to move
 					}
 					break;
