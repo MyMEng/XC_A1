@@ -318,13 +318,6 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
 			// Wait for response
 			toController :> moveAllowed;
 
-			//printf("GOT FROM CONTROLLER\n");
-			if(moveAllowed == GAMELOST)
-			{
-				printf("After buttno pressed: GAMELOST\n");
-				isEnd = true;
-				break;
-			}
 			if(moveAllowed == true) {
 				userAntPosition = attemptedAntPosition;
 				toVisualiser <: userAntPosition;
@@ -465,6 +458,12 @@ void controller(chanend fromAttacker, chanend fromUser) {
 
 		//start game when user moves
 		fromUser :> attempt;
+
+		if(attempt == 1023 || attempt == 1024)
+			continue;
+		else
+			fromUser <: 1;
+
 		//and remember its position
 		lastReportedUserAntPosition = attempt;
 
