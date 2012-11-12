@@ -243,8 +243,11 @@ void buttonListener(in port b, out port spkr, chanend toUserAnt, chanend fromCon
 
 			// check if some buttons are pressed
 			case b when pinsneq(15) :> r:
+				printf("Buttons \n");
 				break;
 			case fromController :> canProceed:
+				printf("From controller\n");
+				r = 0; // No buttons presssed
 				break;
 		}
 
@@ -285,6 +288,8 @@ void buttonListener(in port b, out port spkr, chanend toUserAnt, chanend fromCon
 		// Don't do anything if A or D wasn't pressed (no move)
 		if(!buttonAorDwasPressed)
 			continue;
+
+		printf("Gonna send to user buttons buttons\n");
 
 		// send button pattern to userAnt
 		toUserAnt <: r;
@@ -429,11 +434,15 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
 			// Wait for response
 			toController :> moveAllowed;
 
+
 			if(moveAllowed == true) {
 				userAntPosition = attemptedAntPosition;
 				toVisualiser <: userAntPosition;
-			} else {
-				//BLNK LED
+			} else if (moveAllowed == GAMELOST || GAMEWON){
+				printf("MAM CIE!");
+				isLost = (moveAllowed == GAMELOST);
+				isWon = !isLost;
+				continue;
 			}
 		}
 	}
@@ -667,10 +676,14 @@ void controller(chanend fromAttacker, chanend fromUser, chanend toButtons) {
 				}
 
 				if(isLost) {
-					printf("Send to sending to buttons\n");
-					toButtons <: false;
+					//printf("Send to sending to buttons\n");
+					//toButtons <: false;
 					printf("Send to user\n");
 					fromUser <: GAMELOST;
+					waitMoment();
+					printf("Send to sending to buttons\n");
+					toButtons <: false;
+
 					printf("Sent!\n");
 
 
