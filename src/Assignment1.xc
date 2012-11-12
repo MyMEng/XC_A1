@@ -87,8 +87,8 @@ typedef unsigned int bool;
 #define GAMEWON 1336
 
 // Pause signals
-#define PAUSEON 1023
-#define PAUSEOFF 1024
+#define PAUSEOFF 1023
+#define PAUSEON 1024
 
 // Initial user and attacker positions
 #define USERINITIALPOS 11
@@ -342,8 +342,11 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
 			select {
 				case fromButtons :> buttonInput:
 					// Prevent from listenting buttons
-					if(isLost == true)
+					//TU byl blad
+					if(isLost == true) {
+						printf("whyyyy?\n");
 						continue;
+					}
 					break;
 				case toController :> code:
 					switch(code) {
