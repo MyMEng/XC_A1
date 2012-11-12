@@ -69,7 +69,13 @@ out port speaker = PORT_SPEAKER;
 #define FRQ_B 40000
 
 // Number of defends needed to win
-#define NUMBER_OF_DEFENDS_TO_WIN 5 //25
+#define NUMBER_OF_DEFENDS_TO_WIN 15
+
+// Level increment
+#define LEVEL_INCREMENT 2
+
+// Defines how fast it should speed up
+#define LEVEL_SPEEDUP 25
 
 // Define bool, true and false
 typedef unsigned int bool;
@@ -156,6 +162,7 @@ void visualiser(chanend fromUserAnt, chanend fromAttackerAnt, chanend toQuadrant
 			// Indicates if red leds should be user, if false use green
 			bool flashRed = true;
 
+			// Choose color depending on winning or loosing
 			if(userAntToDisplay == GAMEWON) {
 				flashRed = false;
 			}
@@ -175,7 +182,10 @@ void visualiser(chanend fromUserAnt, chanend fromAttackerAnt, chanend toQuadrant
 				k = 0;
 				for(int j = 0; j < 3; j++)
 				{
+					// Increase the position - it changes by 16
 					k += 16 << j;
+
+					// Show on an appropriate quadrant
 					switch(i) {
 						case 0: toQuadrant0 <: k; break;
 						case 1: toQuadrant1 <: k; break;
@@ -185,6 +195,8 @@ void visualiser(chanend fromUserAnt, chanend fromAttackerAnt, chanend toQuadrant
 					waitMoment();
 				}
 			}
+
+			// Reset the variable
 			userAntToDisplay = 0;
 			continue;
 		}
@@ -266,7 +278,7 @@ void buttonListener(in port b, out port spkr, chanend toUserAnt) {
 
 		// play sound
 		if (!muteSound)
-			playSound(20000, spkr, 15);
+			playSound(200000, spkr, 15);
 
 		// send button pattern to userAnt
 		toUserAnt <: r;
@@ -583,8 +595,6 @@ void controller(chanend fromAttacker, chanend fromUser) {
 			select {
 				case fromAttacker :> attempt:
 
-					// Slow down, depending on level
-					//waitMomentCustom((unsigned int)(DEFAULTDELAY / level));
 
 					//check whether attacker can move
 					if (attempt != lastReportedUserAntPosition) {
@@ -602,6 +612,11 @@ void controller(chanend fromAttacker, chanend fromUser) {
 						}
 
 						fromAttacker <: 1; //allow to move
+
+						// Slow down, depending on level
+						if(!isWon && !isLost)
+							waitMomentCustom((unsigned int)(DEFAULTDELAY / level));
+
 					} else {
 						//do not allow to move
 						fromAttacker <: 0;
@@ -613,8 +628,8 @@ void controller(chanend fromAttacker, chanend fromUser) {
 						}
 
 						// Check if should increase level
-						if(defendedCount % 5 == 0) {
-							level *= 2;
+						if(defendedCount % LEVEL_INCREMENT == 0) {
+							level *= LEVEL_SPEEDUP;
 						}
 
 						// increase defended count
