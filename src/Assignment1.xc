@@ -232,15 +232,27 @@ void playSound(unsigned int wavelength, out port speaker, int timePeriod) {
 }
 
 //READ BUTTONS and send to userAnt
-void buttonListener(in port b, out port spkr, chanend toUserAnt) {
+void buttonListener(in port b, out port spkr, chanend toUserAnt, chanend fromController) {
 	int r = 0;
 	bool muteSound = false, pause = false, buttonAorDwasPressed = false;
+	bool canProceed = true;
 
 	while (true) {
-		// check if some buttons are pressed
-		b when pinsneq(15) :> r;
+		select {
 
-		switch(r){
+
+			// check if some buttons are pressed
+			case b when pinsneq(15) :> r:
+				break;
+			case fromController :> canProceed:
+				break;
+		}
+
+		if(!canProceed)
+			continue;
+
+
+		switch(r) {
 			case buttonB:
 				// Toogle mute sound
 				muteSound = !muteSound;
@@ -342,23 +354,29 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
 			select {
 				case fromButtons :> buttonInput:
 					// Prevent from listenting buttons
-					//TU byl blad
-					if(isLost == true) {
-						printf("whyyyy?\n");
+					//nie wkonujr sie
+					if(isLost || isWon) {
+						printf("Continuing\n");
 						continue;
 					}
+
 					break;
 				case toController :> code:
+
+					printf("User controller wants something!\n");
 					switch(code) {
 					case GAMELOST:
 						isLost = true;
 						break;
+
 					case GAMEWON:
 						isWon = true;
 						break;
+
 					default:
 						isWon = false; isLost = false;
 						break;
+
 					}
 					break;
 			}
@@ -370,6 +388,7 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
 					printf("User: Game Won\n");
 					toVisualiser <: GAMEWON;
 				} else {
+					printf("User: Game Lost\n");
 					toVisualiser <: GAMELOST;
 				}
 				break;
@@ -506,6 +525,7 @@ void attackerAnt(chanend toVisualiser, chanend toController) {
 			}
 			// Check if the game is still going on... get out of loop if needed
 			else if(moveAllowed == GAMELOST) {
+				printf("ATTAK: GAMELOST\n");
 				// Make sure last 'winning' position is shown
 				toVisualiser <: attemptedAntPosition;
 				// Break the inner loop, reinitialize variables, restart the game
@@ -528,7 +548,7 @@ void attackerAnt(chanend toVisualiser, chanend toController) {
 				normalizeAntPosition(attemptedAntPosition);
 				attackerAntPosition = attemptedAntPosition;
 			}
-\
+
 			// Move Ant wherever it was decided
 			toVisualiser <: attackerAntPosition;
 
@@ -545,7 +565,7 @@ void attackerAnt(chanend toVisualiser, chanend toController) {
 // the controller process responds to permission-to-move requests
 // from attackerAnt and userAnt. The process also checks if an attackerAnt
 // has moved to LED positions I, XII and XI.
-void controller(chanend fromAttacker, chanend fromUser) {
+void controller(chanend fromAttacker, chanend fromUser, chanend toButtons) {
 
 	// Loop to keep the game going
 	while(true) {
@@ -569,6 +589,9 @@ void controller(chanend fromAttacker, chanend fromUser) {
 		unsigned int attempt = 0;
 
 		//printf("Start of new game\n");
+
+		// Enable buttons
+		toButtons <: true;
 
 		//start game when user moves
 		fromUser :> attempt;
@@ -597,6 +620,7 @@ void controller(chanend fromAttacker, chanend fromUser) {
 							|| lastReportedAttackerAntPosition == 11
 							|| lastReportedAttackerAntPosition == 0) {
 
+							printf("Controller sending gamelost to attacker\n");
 							// Send a 'game over' signal to attacker and user
 							fromAttacker <: GAMELOST;
 							isLost = true;
@@ -643,14 +667,20 @@ void controller(chanend fromAttacker, chanend fromUser) {
 				}
 
 				if(isLost) {
+					printf("Send to sending to buttons\n");
+					toButtons <: false;
+					printf("Send to user\n");
 					fromUser <: GAMELOST;
-					waitMoment();
+					printf("Sent!\n");
+
+
 					//printf("Restarting controller\n");
 					// Break controller inner loop and restart
 					break;
 				}
 				else if(isWon)
 				{
+					toButtons <: false;
 					printf("Controller: Game Won\n");
 					fromAttacker <: GAMEWON;
 					fromUser <: GAMEWON;
@@ -679,16 +709,19 @@ int main(void) {
 	//channel from userAnt to Controller
 	chan userAntToController;
 
+	//channel between buttons and controller
+	chan buttonsToController;
+
 	chan quadrant0, quadrant1, quadrant2, quadrant3; //helper channels for LED visualisation
 
 	par{
 		//PROCESSES FOR YOU TO EXPAND
 		on stdcore[1]: userAnt(buttonsToUserAnt, userAntToVisualiser, userAntToController);
 		on stdcore[2]: attackerAnt(attackerAntToVisualiser, attackerAntToController);
-		on stdcore[3]: controller(attackerAntToController, userAntToController);
+		on stdcore[3]: controller(attackerAntToController, userAntToController, buttonsToController);
 
 		//HELPER PROCESSES
-		on stdcore[0]: buttonListener(buttons, speaker, buttonsToUserAnt);
+		on stdcore[0]: buttonListener(buttons, speaker, buttonsToUserAnt, buttonsToController);
 		on stdcore[0]: visualiser(userAntToVisualiser, attackerAntToVisualiser, quadrant0, quadrant1, quadrant2, quadrant3);
 		on stdcore[0]: showLED(cled0,quadrant0);
 		on stdcore[1]: showLED(cled1,quadrant1);
