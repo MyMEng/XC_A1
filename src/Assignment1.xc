@@ -17,9 +17,9 @@
 // XC-1A board. Your task is to extend the given skeleton code to implement
 // the following game:
 //
-// An “LED Ant” is represented by a position on the clock wheel of the
-// XC-1A board. Each “LED Ant” is visualised by one active red LED on
-// the 12-position LED clock marked with LED labels I, II, II,…, XII.
+// An √íLED Ant√ì is represented by a position on the clock wheel of the
+// XC-1A board. Each √íLED Ant√ì is visualised by one active red LED on
+// the 12-position LED clock marked with LED labels I, II, II,√â, XII.
 // No two LED Ants can have the same position on the clock. During the
 // game, the user has to defend LED positions I, XII and XI from an
 // LED Attacker Ant by controlling one LED Defender Ant and blocking the
@@ -29,7 +29,7 @@
 // The user controls one LED Ant by pressing either button A (moving
 // 1 position clockwise) or button D (moving 1 position anti-clockwise).
 // The defender ant can only move to a position that is not already occupied
-// by the attacker ant. The defender’s starting position is LED XII. A sound
+// by the attacker ant. The defender√ïs starting position is LED XII. A sound
 // is played when the user presses a button.
 //
 // Attacker Ant
@@ -68,6 +68,9 @@ out port speaker = PORT_SPEAKER;
 #define FRQ_A 39995
 #define FRQ_B 40000
 
+// Number of defends needed to win
+#define NUMBER_OF_DEFENDS_TO_WIN 5 //25
+
 // Define bool, true and false
 typedef unsigned int bool;
 #define true 1
@@ -77,24 +80,22 @@ typedef unsigned int bool;
 #define LEDDELAY 100000
 #define DEFAULTDELAY 8000000
 
-// Number of defends needed to win
-#define NUMBER_OF_DEFENDS_TO_WIN 25
-
 // Game lost signal
 #define GAMELOST 100536
 
 // Game won signal
 #define GAMEWON 1336
 
-// Pause signals
-#define PAUSEON 1023
-#define PAUSEOFF 1024
+//Pause definitions
+#define PAUSEOFF 1023
+#define PAUSEON 1024
 
 // Initial user and attacker positions
 #define USERINITIALPOS 11
 #define ATTACKERINITIALPOS 5
 
-int mario[2][14] = {{660, 0,   660, 0,   660, 0, 510, 0,   660, 0,   770, 0,   380, 0}, {100, 150, 100, 300, 100, 300,   100, 100, 100, 300, 100, 550, 100, 575}};
+//int mario[2][14] = {{660, 0,   660, 0,   660, 0, 510, 0,   660, 0,   770, 0,   380, 0},
+//	{100, 150, 100, 300, 100, 300,   100, 100, 100, 300, 100, 550, 100, 575}};
 
 // Forward declare waitMoment
 void waitMoment();
@@ -120,16 +121,18 @@ int showLED(out port p, chanend fromVisualiser) {
 void visualiser(chanend fromUserAnt, chanend fromAttackerAnt, chanend toQuadrant0, chanend toQuadrant1, chanend
 		toQuadrant2, chanend toQuadrant3) {
 
-	// Initialize positions
+	//initialize positions
 	unsigned int userAntToDisplay = USERINITIALPOS;
 	unsigned int attackerAntToDisplay = ATTACKERINITIALPOS;
 
-	// Should exit?
+	//Should exit?
     unsigned int terminationCode = 0;
 
-    // Quadrants
+    //Quadrants
     unsigned int q0, q1, q2, q3;
 	int i, j, k;
+
+
 	// Timer variables
 	unsigned int t = 0, t0 = 0;
 	timer tmr;
@@ -155,13 +158,12 @@ void visualiser(chanend fromUserAnt, chanend fromAttackerAnt, chanend toQuadrant
 
 			if(userAntToDisplay == GAMEWON) {
 				flashRed = false;
-				printf("Visualiser: Game Won\n");
 			}
+
 			// Display game lost animiation
 			// i.e. flash red leds in a circle
 			cledG <: !flashRed;
 			cledR <: flashRed;
-
 			// Clear the LEDs
 			toQuadrant0 <: 0;
 			toQuadrant1 <: 0;
@@ -183,6 +185,7 @@ void visualiser(chanend fromUserAnt, chanend fromAttackerAnt, chanend toQuadrant
 					waitMoment();
 				}
 			}
+			userAntToDisplay = 0;
 			continue;
 		}
 
@@ -234,7 +237,7 @@ void playSound(unsigned int wavelength, out port speaker, int timePeriod) {
 //READ BUTTONS and send to userAnt
 void buttonListener(in port b, out port spkr, chanend toUserAnt) {
 	int r = 0;
-	bool muteSound = false, pause = false, buttonAorDwasPressed = false;
+	bool muteSound = false, pause = false;
 
 	while (true) {
 		// check if some buttons are pressed
@@ -253,26 +256,17 @@ void buttonListener(in port b, out port spkr, chanend toUserAnt) {
 				// Wait to slow down movements when buttons are pressed
 				waitMomentCustom(DEFAULTDELAY*2);
 				break;
-			case buttonA:
-			case buttonD:
+			default:
 				// Wait a bit shorter to slow down controling buttons
 				waitMoment();
-				buttonAorDwasPressed = true;
-				break;
-			default:
 				break;
 		}
 
-		// Display B and/or C led
 		buttonLed <: (2 * muteSound) + (4 * pause); ;
 
-		// play sound if not muted
+		// play sound
 		if (!muteSound)
-			playSound(20000, spkr, 50);
-
-		// Don't do anything if A or D wasn't pressed (no move)
-		if(!buttonAorDwasPressed)
-			continue;
+			playSound(20000, spkr, 15);
 
 		// send button pattern to userAnt
 		toUserAnt <: r;
@@ -322,12 +316,15 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
 		//the verdict of the controller if move is allowed
 		int moveAllowed = false;
 
-		// Code send from controoler
-		int code = 0;
-
 		// Flag indicating if game is over
 		bool isLost = false;
 		bool isWon = false;
+
+		// Code send from controoler
+		int code = 0;
+
+		// Loop counter
+		//int i = 0;
 
 		// Report initial position
 		toVisualiser <: userAntPosition;
@@ -351,20 +348,21 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
 						isLost = true;
 						break;
 					case GAMEWON:
+						printf("Got gamewon on user\n");
 						isWon = true;
 						break;
 					default:
-						isWon = false; isLost = false;
+						//isWon = false; isLost = false;
 						break;
 					}
 					break;
 			}
 
 			// Check if the game is still going on... restart loop if game over
-			if(isLost || isWon)
+			if(isLost == true || isWon == true)
 			{
+
 				if(isWon) {
-					printf("User: Game Won\n");
 					toVisualiser <: GAMEWON;
 				} else {
 					toVisualiser <: GAMELOST;
@@ -377,7 +375,7 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
 			else if (buttonInput == buttonD) attemptedAntPosition = userAntPosition - 1;
 			else if (buttonInput == buttonC){
 				// Handle pause:
-				toController <: PAUSEON;
+				toController <: 1024;
 
 				while(true) {
 					bool endPause = false;
@@ -385,7 +383,7 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
 						case fromButtons :> buttonInput:
 							if(buttonInput == buttonC) {
 								endPause = true;
-								toController <: PAUSEOFF;
+								toController <: 1023;
 							}
 							break;
 						default:
@@ -411,7 +409,7 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
 				userAntPosition = attemptedAntPosition;
 				toVisualiser <: userAntPosition;
 			} else {
-				//BLNK LED
+				//LED
 			}
 		}
 	}
@@ -446,9 +444,10 @@ void attackerAnt(chanend toVisualiser, chanend toController) {
 		int currentDirection = 1;
 
 		//the verdict of the controller if move is allowed
-		bool moveAllowed = false, paused = false;
+		bool moveAllowed = false;
 
-		// Code given from controller
+		//Pause decider
+		bool paused = false;
 		int code = 0;
 
 		// Is game won?
@@ -471,8 +470,8 @@ void attackerAnt(chanend toVisualiser, chanend toController) {
 			}
 
 			// If game is won, return to the begining
-			if(isWon) { printf("Attacker: Game Won 1\n");
-				break; }
+			if(isWon)
+				break;
 
 			if(paused) continue;
 
@@ -510,9 +509,7 @@ void attackerAnt(chanend toVisualiser, chanend toController) {
 			}
 			// Check if game was won, then just exit
 			else if(moveAllowed == GAMEWON) {
-				printf("Attacker: Game Won 2\n");
 				break;
-			// Otherwise perform a move in other direction
 			} else {
 				// If attacker is next to the user and not allowed to move
 				// then change direction
@@ -525,7 +522,7 @@ void attackerAnt(chanend toVisualiser, chanend toController) {
 				normalizeAntPosition(attemptedAntPosition);
 				attackerAntPosition = attemptedAntPosition;
 			}
-\
+
 			// Move Ant wherever it was decided
 			toVisualiser <: attackerAntPosition;
 
@@ -573,17 +570,21 @@ void controller(chanend fromAttacker, chanend fromUser) {
 		if(attempt == PAUSEOFF || attempt == PAUSEON)
 			continue;
 		else
+			//forbid first move
 			fromUser <: 1;
 
 		//and remember its position
 		lastReportedUserAntPosition = attempt;
+
+		//forbid first move
+		//fromUser <: 1;
 
 		while (true) {
 			select {
 				case fromAttacker :> attempt:
 
 					// Slow down, depending on level
-					waitMomentCustom(DEFAULTDELAY / level);
+					//waitMomentCustom((unsigned int)(DEFAULTDELAY / level));
 
 					//check whether attacker can move
 					if (attempt != lastReportedUserAntPosition) {
@@ -602,11 +603,10 @@ void controller(chanend fromAttacker, chanend fromUser) {
 
 						fromAttacker <: 1; //allow to move
 					} else {
-						// do not allow to move if position was taken
+						//do not allow to move
 						fromAttacker <: 0;
 
-						if(defendedCount >= NUMBER_OF_DEFENDS_TO_WIN)
-						{
+						if(defendedCount >= NUMBER_OF_DEFENDS_TO_WIN) {
 							isWon = true;
 							defendedCount = 0;
 							break;
@@ -619,6 +619,8 @@ void controller(chanend fromAttacker, chanend fromUser) {
 
 						// increase defended count
 						defendedCount++;
+
+
 					}
 					break;
 				case fromUser :> attempt:
@@ -631,10 +633,12 @@ void controller(chanend fromAttacker, chanend fromUser) {
 						fromAttacker <: PAUSEON;
 					} else if (attempt != lastReportedAttackerAntPosition) {
 						lastReportedUserAntPosition = attempt;
-						fromUser <: 1; //allow to move
+						//allow to move
+						fromUser <: 1;
 					} else {
 
-						fromUser <: 0; //do not allow to move
+						//do not allow to move
+						fromUser <: 0;
 					}
 					break;
 				}
@@ -642,15 +646,12 @@ void controller(chanend fromAttacker, chanend fromUser) {
 				if(isLost) {
 					fromUser <: GAMELOST;
 					waitMoment();
-					//printf("Restarting controller\n");
 					// Break controller inner loop and restart
 					break;
-				}
-				else if(isWon)
-				{
-					printf("Controller: Game Won\n");
-					fromAttacker <: GAMEWON;
+				} else if(isWon) {
 					fromUser <: GAMEWON;
+					waitMoment();
+					fromAttacker <: GAMEWON;
 					waitMoment();
 					break;
 				}
