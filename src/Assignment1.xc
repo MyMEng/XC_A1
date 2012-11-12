@@ -360,11 +360,9 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
 						isLost = true;
 						break;
 					case GAMEWON:
-						printf("Got gamewon on user\n");
 						isWon = true;
 						break;
 					default:
-						//isWon = false; isLost = false;
 						break;
 					}
 					break;
@@ -574,22 +572,19 @@ void controller(chanend fromAttacker, chanend fromUser) {
 		//position last reported by attackerAnt or userAnt
 		unsigned int attempt = 0;
 
-		//printf("Start of new game\n");
-
 		//start game when user moves
 		fromUser :> attempt;
 
-		if(attempt == PAUSEOFF || attempt == PAUSEON)
+		if(attempt == PAUSEOFF || attempt == PAUSEON) {
 			continue;
-		else
+		} else {
 			//forbid first move
 			fromUser <: 1;
+		}
 
 		//and remember its position
 		lastReportedUserAntPosition = attempt;
 
-		//forbid first move
-		//fromUser <: 1;
 
 		while (true) {
 			select {
