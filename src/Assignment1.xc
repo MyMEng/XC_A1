@@ -135,6 +135,34 @@ void visualiser(chanend fromUserAnt, chanend fromAttackerAnt, chanend toQuadrant
 				break;
 		}
 
+		if(userAntToDisplay == GAMELOST) {
+			// Display game lost animiation
+			// i.e. flash red leds in a circle
+			cledR <: 1;
+			// Clear the LEDs
+			toQuadrant0 <: 0;
+			toQuadrant1 <: 0;
+			toQuadrant2 <: 0;
+			toQuadrant3 <: 0;
+			waitMoment();
+			for(i = 0; i < 4; i++)
+			{
+				k = 0;
+				for(int j = 0; j < 3; j++)
+				{
+					k += 16 << j;
+					switch(i) {
+						case 0: toQuadrant0 <: k; break;
+						case 1: toQuadrant1 <: k; break;
+						case 2: toQuadrant2 <: k; break;
+						case 3: toQuadrant3 <: k; break;
+					}
+					waitMoment();
+				}
+			}
+			continue;
+		}
+
 		// Position in a quadrant is encoded as multiple of 16:
 		// 16 - first led, 32, second led, 48 - first end second, 64 - third etc.
 		j =  16<<(userAntToDisplay%3);
@@ -254,7 +282,12 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
 
 		//the verdict of the controller if move is allowed
 		int moveAllowed = false;
+
+		// Flag indicating if game is over
 		int isEnd = false;
+
+		// Loop counter
+		//int i = 0;
 
 		// Report initial position
 		toVisualiser <: userAntPosition;
@@ -280,6 +313,8 @@ void userAnt(chanend fromButtons, chanend toVisualiser, chanend toController) {
 			// Check if the game is still going on... restart loop if game over
 			if(isEnd == true)
 			{
+
+				toVisualiser <: GAMELOST;
 				break;
 			}
 
