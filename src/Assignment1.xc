@@ -76,8 +76,12 @@ typedef unsigned int bool;
 // Define delays
 #define LEDDELAY 100000
 #define DEFAULTDELAY 8000000
+
 // Game lost signal
-#define GAMELOST 1337
+#define GAMELOST 100536
+
+// Game won signal
+#define GAMEWON 1336
 
 // Initial user and attacker positions
 #define USERINITIALPOS 11
@@ -118,9 +122,6 @@ void visualiser(chanend fromUserAnt, chanend fromAttackerAnt, chanend toQuadrant
 	unsigned int t = 0, t0 = 0;
 	timer tmr;
 
-	// Green may be always on, we need to alternate red led color
-	cledG <: true;
-	cledR <: false;
 
 	while (true) {
 
@@ -135,10 +136,11 @@ void visualiser(chanend fromUserAnt, chanend fromAttackerAnt, chanend toQuadrant
 				break;
 		}
 
-		if(userAntToDisplay == GAMELOST) {
+		if(userAntToDisplay == GAMELOST || userAntToDisplay == GAMEWON) {
 			// Display game lost animiation
 			// i.e. flash red leds in a circle
-			cledR <: 1;
+			cledG <: false;
+			cledR <: (userAntToDisplay == GAMELOST);
 			// Clear the LEDs
 			toQuadrant0 <: 0;
 			toQuadrant1 <: 0;
@@ -169,6 +171,7 @@ void visualiser(chanend fromUserAnt, chanend fromAttackerAnt, chanend toQuadrant
 		i =  16<<(attackerAntToDisplay%3);
 
 		// Switch off red, green should be light up now
+		cledG <: true;
 		cledR <: false;
 
 		// First display user ant, then quickly display attacker
@@ -181,6 +184,7 @@ void visualiser(chanend fromUserAnt, chanend fromAttackerAnt, chanend toQuadrant
 		waitMomentCustom(LEDDELAY);
 
 		// Switch LED color
+		cledG <: false;
 		cledR <: true;
 		toQuadrant0 <: (i*(attackerAntToDisplay/3==0));
 		toQuadrant1 <: (i*(attackerAntToDisplay/3==1));
@@ -219,15 +223,20 @@ void buttonListener(in port b, out port spkr, chanend toUserAnt) {
 			case buttonB:
 				// Toogle mute sound
 				muteSound = !muteSound;
+				// Wait to slow down movements when buttons are pressed
+				waitMomentCustom(DEFAULTDELAY*2);
 				break;
 			case buttonC:
 				// Toogle pause
 				pause = !pause;
+				// Wait to slow down movements when buttons are pressed
+				waitMomentCustom(DEFAULTDELAY*2);
+				break;
+			default:
+				// Wait a bit shorter to slow down controling buttons
+				waitMoment();
 				break;
 		}
-
-		// Wait to slow down movements when buttons are pressed
-		waitMomentCustom(DEFAULTDELAY*2);
 
 		buttonLed <: (2 * muteSound) + (4 * pause); ;
 
